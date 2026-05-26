@@ -1,428 +1,738 @@
-# Multi-Cloud Data Lakehouse Platform
-### AWS · Azure · GCP · Delta Lake · dbt · Airflow
+<div align="center">
 
-<p align="center">
-  <img src="https://img.shields.io/badge/AWS-S3%20%7C%20Glue%20%7C%20Lake%20Formation-FF9900?style=for-the-badge&logo=amazon-aws&logoColor=white"/>
-  <img src="https://img.shields.io/badge/Azure-ADF%20%7C%20Synapse%20%7C%20ADLS-0078D4?style=for-the-badge&logo=microsoft-azure&logoColor=white"/>
-  <img src="https://img.shields.io/badge/GCP-BigQuery%20%7C%20Dataflow%20%7C%20Pub%2FSub-4285F4?style=for-the-badge&logo=google-cloud&logoColor=white"/>
-  <img src="https://img.shields.io/badge/IaC-Terraform-7B42BC?style=for-the-badge&logo=terraform&logoColor=white"/>
-  <img src="https://img.shields.io/badge/Transforms-dbt-FF694B?style=for-the-badge&logo=dbt&logoColor=white"/>
-  <img src="https://img.shields.io/badge/Orchestration-Airflow-017CEE?style=for-the-badge&logo=apache-airflow&logoColor=white"/>
-</p>
+# 🌐 Multi-Cloud Data Lakehouse Platform
 
----
+### Production-grade data lakehouse spanning AWS · Azure · GCP
 
-## Overview
+[![AWS](https://img.shields.io/badge/AWS-S3%20%7C%20Glue%20%7C%20Lake%20Formation-FF9900?style=flat-square&logo=amazon-aws&logoColor=white)](https://aws.amazon.com/)
+[![Azure](https://img.shields.io/badge/Azure-ADF%20%7C%20Synapse%20%7C%20ADLS-0078D4?style=flat-square&logo=microsoft-azure&logoColor=white)](https://azure.microsoft.com/)
+[![GCP](https://img.shields.io/badge/GCP-BigQuery%20%7C%20Dataflow%20%7C%20Pub%2FSub-4285F4?style=flat-square&logo=google-cloud&logoColor=white)](https://cloud.google.com/)
+[![Terraform](https://img.shields.io/badge/IaC-Terraform-7B42BC?style=flat-square&logo=terraform&logoColor=white)](https://terraform.io/)
+[![dbt](https://img.shields.io/badge/Transform-dbt-FF694B?style=flat-square&logo=dbt&logoColor=white)](https://getdbt.com/)
+[![Airflow](https://img.shields.io/badge/Orchestrate-Airflow-017CEE?style=flat-square&logo=apache-airflow&logoColor=white)](https://airflow.apache.org/)
+[![Delta Lake](https://img.shields.io/badge/Storage-Delta%20Lake-00ADD8?style=flat-square&logo=databricks&logoColor=white)](https://delta.io/)
+[![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?style=flat-square&logo=github-actions&logoColor=white)](https://github.com/features/actions)
 
-This project demonstrates a **production-grade, multi-cloud data lakehouse** that unifies AWS, Azure, and GCP into a single, coherent data platform. It combines the openness of Delta Lake with the analytical power of BigQuery, the ETL maturity of Azure Data Factory, and the transformation elegance of dbt — all orchestrated by Apache Airflow and deployed via Terraform IaC.
+<br/>
 
-The architecture is designed to mirror real-world enterprise data platforms where data residency, vendor neutrality, and best-of-breed tooling across clouds are non-negotiable requirements.
+> Designed and implemented a unified multi-cloud data lakehouse combining Delta Lake on AWS S3, Azure Data Factory + Synapse Analytics, GCP BigQuery + Dataflow, dbt transformation layers, and Apache Airflow orchestration — demonstrating end-to-end data engineering across all three major cloud platforms.
 
----
-
-## Architecture Diagram
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                     MULTI-CLOUD DATA LAKEHOUSE PLATFORM                     │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-   DATA SOURCES                INGESTION LAYER               STORAGE LAYER
- ┌──────────────┐         ┌──────────────────────┐      ┌───────────────────┐
- │  On-Premises │────────►│  Azure Data Factory  │─────►│   ADLS Gen2       │
- │  SQL Server  │         │  (Parameterized ETL) │      │  bronze/silver/   │
- └──────────────┘         └──────────────────────┘      │  gold containers  │
-                                                         └─────────┬─────────┘
- ┌──────────────┐         ┌──────────────────────┐                 │
- │  Cloud APIs  │────────►│   AWS Glue + S3       │──────┐         │
- │  & SaaS      │         │  (Delta Lake Bronze)  │      │         │
- └──────────────┘         └──────────────────────┘      │         │
-                                                         ▼         ▼
- ┌──────────────┐         ┌──────────────────────┐  ┌───────────────────────┐
- │  Streaming   │────────►│  GCP Pub/Sub +        │  │    TRANSFORMATION     │
- │  Events      │         │  Dataflow Pipeline    │  │                       │
- └──────────────┘         └──────────────────────┘  │  dbt (BigQuery +      │
-                                                     │  Snowflake targets)   │
-                                                     │                       │
-                                                     │  staging layer        │
-                                                     │  ↓                    │
-                                                     │  marts layer (gold)   │
-                                                     └───────────┬───────────┘
-                                                                 │
-                                                                 ▼
-                                                     ┌───────────────────────┐
-                                                     │   ANALYTICS LAYER     │
-                                                     │                       │
-                                                     │  BigQuery             │
-                                                     │  • Partitioned tables │
-                                                     │  • Clustered tables   │
-                                                     │  • BigQuery ML        │
-                                                     │                       │
-                                                     │  Synapse Analytics    │
-                                                     │  • Dedicated SQL Pool │
-                                                     │  • Spark Pool         │
-                                                     └───────────────────────┘
-
-                    ┌─────────────────────────────────────────────┐
-                    │         ORCHESTRATION (Apache Airflow)       │
-                    │                                              │
-                    │  Ingestion → dbt Bronze→Silver → dbt Gold   │
-                    │  → BQ Load → Quality Gate → Reconciliation  │
-                    └─────────────────────────────────────────────┘
-
-                    ┌─────────────────────────────────────────────┐
-                    │              GOVERNANCE & SECURITY           │
-                    │  AWS: IAM least-privilege + Lake Formation   │
-                    │  Azure: AAD RBAC + Key Vault + Purview       │
-                    │  GCP: IAM service accounts + CMEK            │
-                    │  Cross-cloud: Column masking, audit logging  │
-                    └─────────────────────────────────────────────┘
-```
+</div>
 
 ---
 
-## Data Flow Diagram
+## 📋 Table of Contents
 
-```
-RAW LANDING (Bronze)
-     │
-     │  ← AWS: S3 Delta Lake (ACID, time travel, schema enforcement)
-     │  ← Azure: ADLS Gen2 Parquet via ADF pipelines
-     │  ← GCP: BigQuery streaming via Dataflow/Pub/Sub
-     │
-     ▼
-STANDARDIZED (Silver)                    dbt staging models
-     │                                   • Column normalization
-     │                                   • Type casting
-     │                                   • PII masking
-     │                                   • Source deduplication
-     │
-     ▼
-BUSINESS-READY (Gold)                    dbt mart models
-     │                                   • Fact tables (incremental)
-     │                                   • Dimension tables (SCD)
-     │                                   • Aggregates
-     │                                   • BigQuery ML scoring
-     │
-     ▼
-CONSUMPTION LAYER
-     ├── BigQuery (BI tools, ad-hoc SQL, ML)
-     ├── Synapse Analytics (SQL pool, Power BI DirectQuery)
-     └── Delta Lake on S3 (Glue Catalog, Athena, EMR)
-```
+- [Overview](#-overview)
+- [High-Level Architecture](#-high-level-architecture)
+- [Data Flow: Bronze → Silver → Gold](#-data-flow-bronze--silver--gold)
+- [Component Deep-Dives](#-component-deep-dives)
+  - [AWS — Delta Lake on S3](#1-aws--delta-lake-on-s3)
+  - [Azure — ADF + Synapse Analytics](#2-azure--adf--synapse-analytics)
+  - [GCP — BigQuery + Dataflow](#3-gcp--bigquery--dataflow)
+  - [dbt — Transformation Layer](#4-dbt--transformation-layer)
+  - [Airflow — Orchestration](#5-airflow--orchestration)
+  - [Governance & Security](#6-governance--security)
+- [CI/CD Pipeline](#-cicd-pipeline)
+- [Repository Structure](#-repository-structure)
+- [Technology Stack](#-technology-stack)
+- [Local Development](#-local-development)
+- [Skills Demonstrated](#-skills-demonstrated)
 
 ---
 
-## Repository Structure
+## 🔭 Overview
+
+This project delivers a **production-grade, vendor-neutral data lakehouse** that unifies three hyperscaler clouds into one coherent data platform. It solves a real enterprise problem: organizations that need AWS for compute, Azure for identity and enterprise tooling, and GCP for analytics cannot afford data silos between them.
+
+**Key outcomes this platform delivers:**
+
+| Outcome | How |
+|---|---|
+| **ACID reliability on cheap object storage** | Delta Lake on S3 — merge, time travel, schema enforcement |
+| **Enterprise ETL at scale** | Azure Data Factory parameterized pipelines with watermark-based incremental loads |
+| **Serverless petabyte analytics** | BigQuery partitioned + clustered tables with in-warehouse ML scoring |
+| **Exactly-once streaming ingestion** | Apache Beam / Dataflow with Pub/Sub and dead-letter routing |
+| **Consistent SQL transformation layer** | dbt targeting both BigQuery and Snowflake with full lineage |
+| **Zero-downtime deployments** | GitHub Actions CI/CD with OIDC keyless auth to all three clouds |
+
+---
+
+## 🏗 High-Level Architecture
 
 ```
-multi-cloud-lakehouse/
-│
-├── terraform/                        # Infrastructure as Code (Terraform)
-│   ├── main.tf                       # Root module — wires AWS, Azure, GCP modules
-│   ├── variables.tf                  # Input variable definitions
-│   ├── outputs.tf                    # Infrastructure outputs
-│   ├── aws/
-│   │   └── main.tf                   # S3 Delta Lake, Glue, Lake Formation, IAM, CloudTrail
-│   ├── azure/
-│   │   └── main.tf                   # ADLS Gen2, ADF, Synapse, Key Vault, Purview, RBAC
-│   └── gcp/
-│       └── main.tf                   # BigQuery, Dataflow, Pub/Sub, GCS, KMS, IAM SAs
-│
-├── airflow/
-│   └── dags/
-│       └── multi_cloud_lakehouse_dag.py   # Master orchestration DAG
-│
-├── dbt/                              # dbt transformation project
-│   ├── dbt_project.yml               # Project config — materialization, tags, layers
-│   ├── profiles.yml                  # BigQuery + Snowflake connection profiles
-│   └── models/
-│       ├── staging/
-│       │   ├── sources.yml           # Source definitions with freshness checks
-│       │   └── stg_events.sql        # Staging model: normalize + deduplicate events
-│       └── marts/
-│           └── fct_events.sql        # Gold-layer incremental fact table (BigQuery)
-│
-├── gcp/
-│   ├── dataflow/
-│   │   └── pubsub_to_bigquery.py     # Apache Beam streaming pipeline
-│   └── bigquery/
-│       └── schemas/
-│           └── events.json           # BigQuery table schema definition
-│
-├── aws/
-│   └── delta_lake/
-│       └── delta_utils.py            # Delta Lake Python utilities (upsert, time travel, vacuum)
-│
-├── azure/
-│   └── adf_pipelines/
-│       └── PL_Ingest_OnPrem_to_ADLS.json   # ADF pipeline with watermark + upsert logic
-│
-├── docker/
-│   ├── Dockerfile.airflow            # Custom Airflow image with all provider SDKs
-│   └── docker-compose.yml            # Full local dev stack (Airflow + Postgres + Redis + dbt)
-│
-├── .github/
-│   └── workflows/
-│       └── ci_cd.yml                 # GitHub Actions CI/CD (lint → test → TF plan → deploy)
-│
-└── requirements.txt                  # Python dependencies
+╔══════════════════════════════════════════════════════════════════════════════════════╗
+║                        MULTI-CLOUD DATA LAKEHOUSE PLATFORM                          ║
+╚══════════════════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────┐    ┌─────────────────────────┐    ┌─────────────────────────┐
+│        DATA SOURCES     │    │      DATA SOURCES        │    │       DATA SOURCES      │
+│                         │    │                          │    │                         │
+│  • On-Premises SQL      │    │  • SaaS Applications     │    │  • Mobile / Web Apps    │
+│  • ERP Systems          │    │  • REST APIs             │    │  • IoT Devices          │
+│  • CRM Databases        │    │  • File Shares           │    │  • Clickstream Events   │
+└────────────┬────────────┘    └───────────┬──────────────┘    └────────────┬────────────┘
+             │                             │                                │
+             ▼                             ▼                                ▼
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+║                              INGESTION LAYER                                        ║
+║                                                                                     ║
+║  ┌──────────────────────┐  ┌──────────────────────┐  ┌───────────────────────────┐ ║
+║  │   AZURE DATA         │  │   AWS GLUE           │  │   GCP DATAFLOW +          │ ║
+║  │   FACTORY (ADF)      │  │   JOBS               │  │   PUB/SUB                 │ ║
+║  │                      │  │                      │  │                           │ ║
+║  │  ✦ Parameterized     │  │  ✦ Delta table        │  │  ✦ Apache Beam pipeline   │ ║
+║  │    pipeline templates│  │    crawler & register │  │  ✦ Exactly-once delivery  │ ║
+║  │  ✦ Watermark-based   │  │  ✦ Schema detection   │  │  ✦ PII masking in-flight  │ ║
+║  │    incremental loads │  │  ✦ Partition pruning  │  │  ✦ Dead-letter routing    │ ║
+║  │  ✦ Linked services   │  │                      │  │  ✦ 60s tumbling windows   │ ║
+║  │    (SQL, ADLS, REST) │  │                      │  │                           │ ║
+║  └──────────┬───────────┘  └──────────┬───────────┘  └─────────────┬─────────────┘ ║
+╚═════════════╪══════════════════════════╪═══════════════════════════╪═══════════════╝
+              │                          │                            │
+              ▼                          ▼                            ▼
+╔═════════════════════════════════════════════════════════════════════════════════════╗
+║                              STORAGE LAYER                                          ║
+║                                                                                     ║
+║  ┌──────────────────────────┐  ┌───────────────────────┐  ┌──────────────────────┐ ║
+║  │  AZURE ADLS GEN2         │  │  AWS S3 (DELTA LAKE)  │  │  GCP CLOUD STORAGE   │ ║
+║  │                          │  │                       │  │                      │ ║
+║  │  bronze/  ◄─ raw ingest  │  │  raw/                 │  │  raw-landing/        │ ║
+║  │  silver/  ◄─ normalized  │  │  bronze/              │  │  dataflow-temp/      │ ║
+║  │  gold/    ◄─ aggregated  │  │  silver/  ◄─ upserts  │  │                      │ ║
+║  │                          │  │  gold/    ◄─ Z-ORDER  │  │  ✦ CMEK encryption   │ ║
+║  │  ✦ Hierarchical namespace│  │  checkpoints/         │  │  ✦ Uniform bucket    │ ║
+║  │  ✦ GRS replication       │  │                       │  │    level access      │ ║
+║  │  ✦ Soft delete 30d       │  │  ✦ ACID transactions  │  │                      │ ║
+║  │  ✦ CMK via Key Vault     │  │  ✦ Time travel        │  │                      │ ║
+║  │                          │  │  ✦ Schema enforcement │  │                      │ ║
+║  └──────────────────────────┘  └───────────────────────┘  └──────────────────────┘ ║
+╚═════════════════════════════════════════════════════════════════════════════════════╝
+              │                          │                            │
+              └──────────────────────────┼────────────────────────────┘
+                                         ▼
+╔═════════════════════════════════════════════════════════════════════════════════════╗
+║                           TRANSFORMATION LAYER (dbt)                                ║
+║                                                                                     ║
+║   Sources (AWS + Azure + GCP)                                                       ║
+║        │                                                                            ║
+║        ├──► staging.*   (Views)    — normalize, cast, deduplicate, mask PII         ║
+║        │         │                                                                  ║
+║        │         ├──► intermediate.* (Ephemeral) — reusable CTEs                   ║
+║        │         │                                                                  ║
+║        │         └──► marts.*      (Tables)   — fact tables, dimensions, aggs       ║
+║        │                    │                                                       ║
+║        │                    └──► BigQuery ML scoring (in-warehouse inference)        ║
+║        │                                                                            ║
+║   Targets: BigQuery (GCP)  ·  Snowflake (cross-platform)                           ║
+╚═════════════════════════════════════════════════════════════════════════════════════╝
+                                         │
+                                         ▼
+╔═════════════════════════════════════════════════════════════════════════════════════╗
+║                            ANALYTICS & SERVING LAYER                                ║
+║                                                                                     ║
+║  ┌──────────────────────┐   ┌──────────────────────┐   ┌──────────────────────┐   ║
+║  │   GCP BIGQUERY       │   │  AZURE SYNAPSE        │   │  AWS ATHENA /        │   ║
+║  │                      │   │  ANALYTICS            │   │  GLUE CATALOG        │   ║
+║  │  ✦ Partitioned by    │   │                       │   │                      │   ║
+║  │    event_date (DAY)  │   │  ✦ Dedicated SQL Pool │   │  ✦ Glue-catalogued   │   ║
+║  │  ✦ Clustered on      │   │  ✦ Apache Spark Pool  │   │    Delta tables      │   ║
+║  │    event_type,       │   │  ✦ Power BI Direct    │   │  ✦ Partition pruning │   ║
+║  │    country, device   │   │    Query              │   │  ✦ Parquet + Snappy  │   ║
+║  │  ✦ BigQuery ML       │   │  ✦ Auto-pause 60 min  │   │                      │   ║
+║  │    churn scoring     │   │                       │   │                      │   ║
+║  └──────────────────────┘   └──────────────────────┘   └──────────────────────┘   ║
+╚═════════════════════════════════════════════════════════════════════════════════════╝
+
+╔═════════════════════════════════════════════════════════════════════════════════════╗
+║                    ORCHESTRATION — Apache Airflow (CeleryExecutor)                  ║
+║                                                                                     ║
+║   Daily @ 03:00 UTC  ──►  Ingestion  ──►  dbt  ──►  BQ Load  ──►  Quality Gate    ║
+╚═════════════════════════════════════════════════════════════════════════════════════╝
+
+╔═════════════════════════════════════════════════════════════════════════════════════╗
+║                    GOVERNANCE, SECURITY & COMPLIANCE (Cross-Cloud)                  ║
+║                                                                                     ║
+║   AWS: IAM least-privilege · Lake Formation · CloudTrail · Macie (PII discovery)   ║
+║   Azure: AAD RBAC · Key Vault · Purview · Azure Monitor · Managed Identity         ║
+║   GCP: Service Accounts · CMEK · Cloud KMS · VPC-SC · Cloud Logging → BQ sink      ║
+╚═════════════════════════════════════════════════════════════════════════════════════╝
 ```
 
 ---
 
-## Key Components
+## 🔄 Data Flow: Bronze → Silver → Gold
+
+```
+ RAW DATA SOURCES
+ ════════════════
+ On-Prem SQL Server ──┐
+ Cloud REST APIs    ──┤──► [ INGESTION ] ──► BRONZE (raw, append-only)
+ Streaming Events   ──┘
+
+                              │
+                              │  Schema enforcement
+                              │  Partition by date
+                              │  ACID guarantees (Delta)
+                              ▼
+
+                       ┌─────────────────────────────────────────────┐
+                       │              BRONZE LAYER                    │
+                       │                                              │
+                       │  • Raw, unmodified source records            │
+                       │  • Append-only writes                        │
+                       │  • Schema-on-write (Delta Lake)              │
+                       │  • Partitioned by _partition_date            │
+                       │  • Full audit trail via Delta transaction log │
+                       └──────────────────┬──────────────────────────┘
+                                          │
+                                          │  dbt staging models
+                                          │  • Column normalization
+                                          │  • Type casting & validation
+                                          │  • PII masking (SHA-256 hash)
+                                          │  • Source deduplication
+                                          │  • Multi-source UNION + dedup
+                                          ▼
+
+                       ┌─────────────────────────────────────────────┐
+                       │              SILVER LAYER                    │
+                       │                                              │
+                       │  • Standardized, conformed schema            │
+                       │  • Deduplicated (event_id as unique key)     │
+                       │  • PII hashed / masked                       │
+                       │  • ACID upserts via Delta MERGE              │
+                       │  • Time-travel queryable (30-day window)     │
+                       └──────────────────┬──────────────────────────┘
+                                          │
+                                          │  dbt mart models
+                                          │  • Business fact tables
+                                          │  • Dimension joins
+                                          │  • Window functions
+                                          │  • Cross-cloud enrichment
+                                          │  • BigQuery ML scoring
+                                          ▼
+
+                       ┌─────────────────────────────────────────────┐
+                       │               GOLD LAYER                     │
+                       │                                              │
+                       │  • Business-ready fact + dimension tables    │
+                       │  • Incremental MERGE materialization         │
+                       │  • BigQuery: partitioned (DAY) + clustered   │
+                       │  • Delta: Z-ORDER optimized for fast reads   │
+                       │  • ML predictions joined inline              │
+                       │  • Powers BI dashboards, ad-hoc SQL, APIs    │
+                       └─────────────────────────────────────────────┘
+```
+
+---
+
+## 🔬 Component Deep-Dives
 
 ### 1. AWS — Delta Lake on S3
 
-**Technology:** `delta-rs` (Rust engine), AWS Glue Data Catalog, AWS Lake Formation, AWS KMS
+**Stack:** `delta-rs` (Rust engine) · AWS Glue Data Catalog · AWS Lake Formation · AWS KMS
 
-Delta Lake provides a reliable, ACID-compliant open table format on top of S3 object storage. This eliminates the historical reliability gap between data lakes (cheap, flexible) and data warehouses (reliable, expensive).
+Delta Lake brings **data warehouse reliability** to cheap S3 object storage. The `delta_utils.py` module implements the full pattern set:
 
-**Implemented Patterns:**
-
-| Pattern | Description |
-|---|---|
-| **ACID Upserts** | `MERGE INTO` semantics via `upsert_silver()` — matched rows updated, unmatched inserted atomically |
-| **Schema Enforcement** | Writes rejected if column names or types diverge from the registered schema |
-| **Schema Evolution** | Additive column additions via `schema_mode=merge` — backward compatible |
-| **Time Travel** | `read_as_of(as_of=datetime(...))` reads any historical snapshot without data duplication |
-| **OPTIMIZE + Z-ORDER** | Bin-packing compaction + Z-ORDER on `user_id`, `event_type` reduces query data scan by 60–80% |
-| **VACUUM** | Reclaims storage from obsolete file versions after configurable retention window |
-
-**Delta Table Layers:**
 ```
-s3://bucket/raw/         ← Landing zone (schema-on-read, append-only)
-s3://bucket/bronze/      ← Schema-enforced, partitioned by _partition_date
-s3://bucket/silver/      ← Deduplicated, upserted, normalized
-s3://bucket/gold/        ← Aggregated, business-ready, Glue-catalogued
-s3://bucket/checkpoints/ ← Spark/Delta streaming checkpoints
+┌─────────────────────────────────────────────────────────────────┐
+│                   DELTA LAKE OPERATION PATTERNS                  │
+├───────────────────┬─────────────────────────────────────────────┤
+│ ACID Upsert/Merge │ matched rows updated · unmatched inserted    │
+│                   │ atomically — no duplicates, no partial writes │
+├───────────────────┼─────────────────────────────────────────────┤
+│ Schema Enforcement│ writes rejected if column names/types differ  │
+│                   │ from the registered schema — zero bad data    │
+├───────────────────┼─────────────────────────────────────────────┤
+│ Schema Evolution  │ additive columns via schema_mode=merge        │
+│                   │ backward-compatible, zero-downtime            │
+├───────────────────┼─────────────────────────────────────────────┤
+│ Time Travel       │ read_as_of(as_of=datetime(2024,1,1))          │
+│                   │ any historical snapshot without duplication   │
+├───────────────────┼─────────────────────────────────────────────┤
+│ OPTIMIZE + VACUUM │ bin-pack + Z-ORDER on user_id, event_type     │
+│                   │ reduces query data scan by 60–80%             │
+└───────────────────┴─────────────────────────────────────────────┘
 ```
+
+**S3 bucket layout:**
+```
+s3://mc-lakehouse-delta-lake-{env}/
+├── raw/            ← landing zone (schema-on-read, append-only)
+├── bronze/         ← schema-enforced, partitioned by _partition_date
+├── silver/         ← deduplicated, upserted, normalized
+├── gold/           ← aggregated, business-ready, Glue-catalogued
+└── checkpoints/    ← Spark / Delta streaming checkpoints
+```
+
+**Glue Crawler** runs every 6 hours on the gold layer and registers Delta tables into the Glue Data Catalog, making them queryable via Amazon Athena, EMR, and Redshift Spectrum without any data movement.
+
+**Lake Formation** enforces column-level access control — analysts can query `gold/events` but cannot read the `ip_hash` or `email_hash` columns without explicit grants.
 
 ---
 
 ### 2. Azure — ADF + Synapse Analytics
 
-**Technology:** Azure Data Factory, Azure Synapse Analytics, ADLS Gen2, Azure Key Vault, Microsoft Purview
+**Stack:** Azure Data Factory v2 · Azure Synapse Analytics · ADLS Gen2 · Key Vault · Microsoft Purview
 
 **ADF Pipeline: `PL_Ingest_OnPrem_to_ADLS`**
 
-A fully parameterized, reusable ingestion template designed for any source table:
+A fully parameterized, reusable ingestion template — a single pipeline definition handles any source table by swapping parameters:
 
 ```
-LookupWatermark → CopySourceToAdls → CopyAdlsToSynapse → UpdateWatermark
+┌──────────────────────────────────────────────────────────────────────┐
+│              ADF PIPELINE EXECUTION FLOW                              │
+│                                                                       │
+│  ┌─────────────────┐                                                  │
+│  │ LookupWatermark │ — reads last successful load timestamp           │
+│  │                 │   from [dbo].[pipeline_control] control table    │
+│  └────────┬────────┘                                                  │
+│           │                                                           │
+│           ▼                                                           │
+│  ┌─────────────────────────────────────────────────────────────────┐ │
+│  │ CopySourceToAdls                                                 │ │
+│  │                                                                  │ │
+│  │  Source: SQL Server (Self-Hosted IR)                             │ │
+│  │  Query:  WHERE updated_at > {watermark} AND updated_at <= {date} │ │
+│  │  Mode:   Dynamic Range Partitioning (parallel reads)             │ │
+│  │  Sink:   ADLS Gen2 bronze/ container                             │ │
+│  │  Format: Parquet + Snappy compression                            │ │
+│  │  DIUs:   8 (auto-scaled data integration units)                  │ │
+│  └────────┬────────────────────────────────────────────────────────┘ │
+│           │                                                           │
+│           ▼                                                           │
+│  ┌─────────────────────────────────────────────────────────────────┐ │
+│  │ CopyAdlsToSynapse                                                │ │
+│  │                                                                  │ │
+│  │  Source: Parquet files in bronze/ container                      │ │
+│  │  Sink:   Synapse Dedicated SQL Pool (COPY command — fastest)     │ │
+│  │  Mode:   UPSERT on primary key                                   │ │
+│  │  Stage:  ADLS Gen2 staging area (PolyBase pattern)               │ │
+│  └────────┬────────────────────────────────────────────────────────┘ │
+│           │                                                           │
+│           ▼                                                           │
+│  ┌─────────────────┐                                                  │
+│  │ UpdateWatermark │ — writes new high-watermark + rows_copied        │
+│  │                 │   to control table for next run                  │
+│  └─────────────────┘                                                  │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Incremental watermark pattern**: reads from a control table, only processes new/changed rows since the last successful load
-- **Dynamic range partitioning**: splits large table reads across parallel threads for performance
-- **Parquet + Snappy compression**: optimal format for columnar analytics workloads
-- **Synapse COPY command**: fastest available bulk-load path into Synapse dedicated SQL pool
+**Synapse Analytics configuration:**
 
-**Synapse Configuration:**
-
-| Component | Purpose |
-|---|---|
-| Dedicated SQL Pool (DW) | Columnar MPP warehouse for BI and reporting queries |
-| Apache Spark Pool | PySpark processing for complex transformations |
-| ADLS Gen2 integration | Direct lakehouse access without data movement |
-| Auto-pause (60 min) | Cost optimization — pool pauses when idle |
+| Component | Config | Purpose |
+|---|---|---|
+| Dedicated SQL Pool | DW500c (prod) / DW100c (dev) | Columnar MPP warehouse for BI |
+| Apache Spark Pool | MemoryOptimized, 2–10 nodes | PySpark complex transforms |
+| Auto-pause | 60 minutes idle | Cost optimization |
+| ADLS Integration | Direct lake access | No data movement for Spark |
+| AAD Admin | Managed Identity | No password-based auth |
 
 ---
 
 ### 3. GCP — BigQuery + Dataflow
 
-**Technology:** BigQuery, Apache Beam / Dataflow, Pub/Sub, BigQuery ML, Cloud KMS
+**Stack:** BigQuery · Apache Beam / Cloud Dataflow · Cloud Pub/Sub · BigQuery ML · Cloud KMS
 
-**Dataflow Streaming Pipeline (`pubsub_to_bigquery.py`)**
-
-Production Apache Beam pipeline with exactly-once semantics:
+**Dataflow Streaming Pipeline architecture:**
 
 ```
-Pub/Sub Subscription
-    └──► Fixed 60s Windows
-              └──► ParseAndValidate (route valid/dead-letter)
-                        └──► MaskPII (hash IP, strip PII fields)
-                                  └──► FormatForBigQuery
-                                              └──► BigQuery Storage Write API
-                                              └──► Dead Letter Table
+┌──────────────────────────────────────────────────────────────────────┐
+│              DATAFLOW PIPELINE: Pub/Sub → BigQuery                    │
+│                                                                       │
+│  Cloud Pub/Sub                                                        │
+│  Subscription ──► ReadFromPubSub                                      │
+│                        │                                             │
+│                        ▼                                             │
+│              WindowInto(FixedWindows(60s))                            │
+│                        │                                             │
+│                        ▼                                             │
+│              ParseAndValidateEvent                                    │
+│               ├── valid ──────────────────────────────────┐          │
+│               └── dead_letter ─────────────────────┐      │          │
+│                                                     │      ▼          │
+│                                              BigQuery DLQ  MaskPII   │
+│                                              Table         │          │
+│                                                            ▼          │
+│                                                   FormatForBigQuery   │
+│                                                            │          │
+│                                                            ▼          │
+│                                                  WriteToBigQuery      │
+│                                                  (Storage Write API   │
+│                                                   exactly-once)       │
+│                                                            │          │
+│                                                            ▼          │
+│                                               BigQuery events table   │
+│                                               (partitioned by day,    │
+│                                                clustered on type/user) │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-**BigQuery Table Design:**
+**PII masking applied in-flight (before any data lands in BigQuery):**
 
+| Field | Action |
+|---|---|
+| `ip_address` | SHA-256 hashed → stored as `ip_hash` |
+| `email` | SHA-256 hashed → stored as `email_hash` |
+| `raw_email`, `phone_number`, `ssn`, `credit_card` | Dropped entirely — never written |
+
+**BigQuery table design:**
 ```sql
--- Partitioned by event_date (DAY granularity)
--- Clustered on: event_type, country_code, device_type
--- Partition filter required — prevents full-table scans
--- CMEK encryption with Cloud KMS
+-- Partition: event_date (DAY granularity)
+-- Cluster:   event_type, country_code, device_type
+-- Filter:    partition filter REQUIRED — no accidental full-table scans
+-- Encrypt:   CMEK via Cloud KMS key ring
+-- Expire:    30 days in dev/staging, never in prod
 ```
 
-**BigQuery ML Integration:**
-
-The Airflow DAG includes a `BigQueryInsertJobOperator` step that calls `ML.PREDICT()` on a trained `churn_classifier` model, scoring the daily event cohort entirely within BigQuery — no data movement to an external ML platform required.
-
----
-
-### 4. dbt — Cross-Platform Transformation Layer
-
-**Technology:** dbt-bigquery, dbt-snowflake, dbt-utils
-
-**Model Architecture:**
-
-```
-sources (BigQuery, Snowflake, external)
-    └──► staging/          ← Views — normalize, cast, mask, deduplicate
-              └──► intermediate/  ← Ephemeral — reusable CTEs
-                        └──► marts/       ← Tables — business fact + dim tables
-```
-
-**`fct_events` (Gold Layer):**
-- Incremental materialization with `MERGE` strategy
-- Daily partitioning + clustering for query cost optimization
-- Session-level window functions (event sequence, time-between-events)
-- Cross-cloud join: AWS events + Azure transactions + GCP streaming
-- BigQuery labels for cost attribution per domain
-
-**Data Quality:**
-- `not_null`, `unique`, `accepted_values` schema tests on every source
-- Source freshness checks (warn >12h, error >24h)
-- Custom `cross_cloud_reconciliation` test comparing row counts across AWS and GCP
-
----
-
-### 5. Apache Airflow Orchestration
-
-**Technology:** Airflow 2.8, CeleryExecutor, Postgres metadata DB, Redis broker
-
-**DAG: `multi_cloud_lakehouse_orchestration`**
-
-Daily at 03:00 UTC with a 4-phase structure:
-
-```
-Phase 1 — INGESTION (parallel)
-  ├── S3KeySensor → GlueJobOperator (AWS)
-  ├── SimpleHttpOperator → ADF REST API (Azure)
-  └── PubSubPullSensor → DataflowStartFlexTemplateOperator (GCP)
-         │
-Phase 2 — DBT TRANSFORMS (sequential)
-  ├── dbt run staging.*
-  ├── dbt run marts.*
-  └── dbt test
-         │
-Phase 3 — BIGQUERY LOAD
-  ├── BigQueryInsertJobOperator (fact_events partition)
-  └── BigQueryInsertJobOperator (ML.PREDICT scoring)
-         │
-Phase 4 — QUALITY GATE
-  ├── BigQueryValueCheckOperator (row count ≥ 1,000)
-  ├── BigQueryValueCheckOperator (NULL user_id = 0)
-  └── cross_cloud_reconciliation (AWS vs GCP count diff < 1%)
+**BigQuery ML — in-warehouse model scoring:**
+```sql
+-- No data movement to an external ML platform
+-- churn_classifier model trained and served entirely within BigQuery
+INSERT INTO ml_predictions
+SELECT user_id, event_date, predicted_label, predicted_label_probs
+FROM ML.PREDICT(
+    MODEL `project.dataset.churn_classifier`,
+    (SELECT * FROM fact_events WHERE event_date = CURRENT_DATE())
+)
 ```
 
 ---
 
-### 6. Data Governance & Security
+### 4. dbt — Transformation Layer
 
-**Principle applied across all three clouds: least-privilege IAM, encryption everywhere, centralized audit logging.**
+**Stack:** dbt-bigquery 1.7 · dbt-snowflake 1.7 · dbt-utils
 
-| Concern | AWS | Azure | GCP |
+**Model DAG (lineage):**
+
+```
+ SOURCES
+ ═══════
+ aws_delta.raw_events          ─────────────────────────┐
+ gcp_streaming.events          ─────────────────────────┤
+ azure_synapse.transactions    ────────────┐             │
+ aws_delta.raw_customers       ───────┐    │             │
+                                      │    │             │
+                                      ▼    ▼             ▼
+ STAGING (Views)              stg_customers  stg_transactions  stg_events
+ ════════════════                      │         │              │
+                                       └────────┬┘              │
+                                                │               │
+                                                ▼               ▼
+ MARTS (Tables)                              dim_customers   fct_events
+ ══════════════                                         (incremental MERGE
+                                                         partitioned + clustered
+                                                         + BigQuery ML join)
+```
+
+**Incremental strategy on `fct_events`:**
+```
+On full refresh: REPLACE entire table partition
+On incremental:  MERGE — matched rows updated, unmatched inserted
+Lookback window: 3 days (late-arriving data tolerance)
+Unique key:      [event_date, user_id, event_type]
+```
+
+**dbt test coverage:**
+
+| Test Type | Example | Severity |
+|---|---|---|
+| `not_null` | `event_id`, `event_timestamp` | error |
+| `unique` | `event_id` per source | error |
+| `accepted_values` | `event_type` in allowed list | error |
+| Source freshness | warn >12h, error >24h | warn/error |
+| Custom data | Cross-cloud record count reconciliation | error |
+
+---
+
+### 5. Airflow — Orchestration
+
+**Stack:** Airflow 2.8 · CeleryExecutor · PostgreSQL metadata DB · Redis broker
+
+**Master DAG: `multi_cloud_lakehouse_orchestration`** — runs daily at 03:00 UTC
+
+```
+START
+  │
+  ├─────────────────────────────────────────────────────────────────┐
+  │              PHASE 1: INGESTION  (parallel TaskGroup)            │
+  │                                                                  │
+  │   AWS ──► S3KeySensor ──────────────► GlueJobOperator           │
+  │           (wait for raw files)         (register Delta tables)   │
+  │                                                                  │
+  │   Azure ──► SimpleHttpOperator ─────────────────────────────    │
+  │             (trigger ADF REST API — PL_Ingest_OnPrem_to_ADLS)   │
+  │                                                                  │
+  │   GCP ──► PubSubPullSensor ─────► DataflowStartFlexTemplate     │
+  │           (confirm messages)        (launch Beam pipeline)       │
+  └──────────────────────────────────────────────────────────┬───────┘
+                                                             │
+  ┌──────────────────────────────────────────────────────────▼───────┐
+  │            PHASE 2: DBT TRANSFORMS  (sequential TaskGroup)        │
+  │                                                                   │
+  │   @task dbt_run_staging  ──►  @task dbt_run_marts  ──►  @task   │
+  │   (stg_events,               (fct_events,              dbt_test  │
+  │    stg_customers,             dim_customers,            (all      │
+  │    stg_transactions)          ml_predictions)            tests)   │
+  └──────────────────────────────────────────────────────────┬───────┘
+                                                             │
+  ┌──────────────────────────────────────────────────────────▼───────┐
+  │           PHASE 3: BIGQUERY LOAD  (TaskGroup)                     │
+  │                                                                   │
+  │   BigQueryInsertJobOperator ──► BigQueryInsertJobOperator         │
+  │   (load fact_events partition)   (ML.PREDICT churn scoring)       │
+  └──────────────────────────────────────────────────────────┬───────┘
+                                                             │
+  ┌──────────────────────────────────────────────────────────▼───────┐
+  │           PHASE 4: QUALITY GATE  (TaskGroup)                      │
+  │                                                                   │
+  │   BigQueryValueCheckOperator ──► BigQueryValueCheckOperator       │
+  │   (row count ≥ 1,000 ±5%)        (NULL user_id count = 0)        │
+  │                      │                                            │
+  │                      └──► @task cross_cloud_reconciliation        │
+  │                           (AWS S3 count vs GCP BQ count < 1% diff)│
+  └──────────────────────────────────────────────────────────┬───────┘
+                                                             │
+                                                            END
+```
+
+---
+
+### 6. Governance & Security
+
+Security is applied at every layer across all three clouds following the principle of **least privilege, encrypt everything, audit everything.**
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    CROSS-CLOUD SECURITY MATRIX                           │
+├──────────────────┬──────────────────┬──────────────────┬────────────────┤
+│ CONCERN          │ AWS              │ AZURE            │ GCP            │
+├──────────────────┼──────────────────┼──────────────────┼────────────────┤
+│ Identity         │ IAM Roles        │ Managed Identity │ Service        │
+│                  │ (no static keys) │ + AAD RBAC       │ Accounts +     │
+│                  │                  │                  │ OIDC           │
+├──────────────────┼──────────────────┼──────────────────┼────────────────┤
+│ Key Management   │ AWS KMS          │ Azure Key Vault  │ Cloud KMS      │
+│                  │ 90-day rotation  │ Purge protection │ Key Ring       │
+│                  │                  │ Soft delete 90d  │ 90-day rotate  │
+├──────────────────┼──────────────────┼──────────────────┼────────────────┤
+│ Encryption       │ SSE-KMS on all   │ Storage Account  │ CMEK on BQ     │
+│ at rest          │ S3 buckets       │ CMK via KV       │ + GCS buckets  │
+├──────────────────┼──────────────────┼──────────────────┼────────────────┤
+│ Encryption       │ TLS 1.2+         │ HTTPS only +     │ VPC Service    │
+│ in transit       │ enforced         │ Private Endpoints│ Controls       │
+├──────────────────┼──────────────────┼──────────────────┼────────────────┤
+│ PII Masking      │ Column-level via │ Dynamic Data     │ SHA-256 hash   │
+│                  │ Glue + LF grants │ Masking (Synapse) │ in Dataflow    │
+├──────────────────┼──────────────────┼──────────────────┼────────────────┤
+│ Audit Logging    │ CloudTrail       │ Azure Monitor +  │ Cloud Logging  │
+│                  │ multi-region,    │ Log Analytics    │ → BQ sink      │
+│                  │ log validation   │ 90d retention    │                │
+├──────────────────┼──────────────────┼──────────────────┼────────────────┤
+│ Fine-grained     │ Lake Formation   │ Synapse RBAC +   │ BQ column-     │
+│ access control   │ column grants    │ Row-Level Sec.   │ level security │
+├──────────────────┼──────────────────┼──────────────────┼────────────────┤
+│ Public access    │ S3 Block Public  │ Network rules    │ Public access  │
+│ prevention       │ Access (all 4)   │ default Deny     │ prevention     │
+│                  │                  │ bypass AzSvcs    │ enforced       │
+├──────────────────┼──────────────────┼──────────────────┼────────────────┤
+│ PII Discovery    │ AWS Macie        │ Microsoft        │ Cloud DLP      │
+│                  │ (prod only)      │ Purview          │ (via policy)   │
+└──────────────────┴──────────────────┴──────────────────┴────────────────┘
+```
+
+---
+
+## 🚀 CI/CD Pipeline
+
+**OIDC keyless authentication** to all three clouds — zero static credentials stored anywhere.
+
+```
+ TRIGGER: push to main/develop · PR to main · manual workflow_dispatch
+                              │
+                              ▼
+          ┌───────────────────────────────────────┐
+          │         lint-and-test                  │
+          │                                        │
+          │  • Ruff linting (Python)               │
+          │  • mypy type checking                  │
+          │  • pytest unit tests                   │
+          │  • Coverage report → Codecov           │
+          └──────────────────┬────────────────────┘
+                             │
+              ┌──────────────┴──────────────┐
+              │                             │
+              ▼                             ▼
+  ┌───────────────────────┐   ┌───────────────────────────┐
+  │    dbt-validate        │   │    terraform-validate      │
+  │                        │   │                            │
+  │  • dbt deps            │   │  • OIDC auth (AWS+AZ+GCP) │
+  │  • dbt compile         │   │  • terraform init          │
+  │  • dbt parse           │   │  • terraform validate      │
+  │    (YAML schema check) │   │  • terraform fmt -check    │
+  │                        │   │  • terraform plan          │
+  │                        │   │  • PR comment with diff    │
+  └───────────────────────┘   └───────────────────────────┘
+              │                             │
+              └──────────────┬──────────────┘
+                             │
+                             ▼
+          ┌───────────────────────────────────────┐
+          │           docker-build                 │
+          │                                        │
+          │  • Build custom Airflow image          │
+          │  • Push to GHCR (GitHub Container Reg) │
+          │  • GHA cache for fast rebuilds         │
+          └──────────────────┬────────────────────┘
+                             │
+              ┌──────────────┴──────────────┐
+              │                             │
+              ▼                             ▼
+  ┌───────────────────────┐   ┌───────────────────────────┐
+  │   deploy-staging       │   │    deploy-production       │
+  │   (develop branch)     │   │    (main branch)           │
+  │                        │   │                            │
+  │  • Sync DAGs to GCS    │   │  • terraform apply         │
+  │  • dbt run (staging)   │   │  • Sync DAGs to GCS        │
+  │  • dbt test (staging)  │   │  • Slack notification      │
+  └───────────────────────┘   └───────────────────────────┘
+```
+
+---
+
+## 📁 Repository Structure
+
+```
+multi-cloud-data-lakehouse/
+│
+├── README.md                                   ← You are here
+├── requirements.txt                            ← Python dependencies (all providers)
+├── .gitignore
+│
+├── .github/
+│   └── workflows/
+│       └── ci_cd.yml                           ← Full CI/CD pipeline (OIDC auth)
+│
+├── terraform/                                  ← Infrastructure as Code
+│   ├── main.tf                                 ← Root module: wires AWS + Azure + GCP
+│   ├── variables.tf                            ← Input variable definitions
+│   ├── outputs.tf                              ← Infrastructure outputs
+│   ├── dev.tfvars                              ← Dev environment variable values
+│   ├── aws/
+│   │   ├── main.tf                             ← S3 Delta Lake · Glue · Lake Formation · KMS · CloudTrail
+│   │   └── variables.tf
+│   ├── azure/
+│   │   ├── main.tf                             ← ADLS Gen2 · ADF · Synapse · Key Vault · Purview · RBAC
+│   │   └── variables.tf
+│   └── gcp/
+│       ├── main.tf                             ← BigQuery · Dataflow · Pub/Sub · GCS · KMS · IAM SAs
+│       └── variables.tf
+│
+├── airflow/
+│   └── dags/
+│       └── multi_cloud_lakehouse_dag.py        ← Master 4-phase orchestration DAG
+│
+├── dbt/
+│   ├── dbt_project.yml                         ← Project config: materialization · tags · layers
+│   ├── profiles.yml                            ← BigQuery + Snowflake connection profiles
+│   └── models/
+│       ├── staging/
+│       │   ├── sources.yml                     ← Source definitions + freshness checks
+│       │   └── stg_events.sql                  ← Bronze→Silver: normalize · deduplicate · mask
+│       └── marts/
+│           └── fct_events.sql                  ← Gold: incremental fact table (BQ partitioned)
+│
+├── aws/
+│   └── delta_lake/
+│       └── delta_utils.py                      ← ACID upserts · time travel · schema enforcement · vacuum
+│
+├── azure/
+│   └── adf_pipelines/
+│       └── PL_Ingest_OnPrem_to_ADLS.json       ← Parameterized ADF pipeline (watermark + upsert)
+│
+├── gcp/
+│   ├── dataflow/
+│   │   └── pubsub_to_bigquery.py               ← Apache Beam exactly-once streaming pipeline
+│   └── bigquery/
+│       └── schemas/
+│           └── events.json                     ← BigQuery events table schema definition
+│
+└── docker/
+    ├── Dockerfile.airflow                      ← Custom Airflow image (all cloud SDKs included)
+    └── docker-compose.yml                      ← Full local dev stack (Airflow + Postgres + Redis + dbt)
+```
+
+---
+
+## 🛠 Technology Stack
+
+| Layer | Technology | Version | Role |
 |---|---|---|---|
-| **Identity** | IAM Roles (no long-lived keys) | AAD RBAC + Managed Identity | Service Accounts + Workload Identity |
-| **Key Management** | AWS KMS (90-day rotation) | Azure Key Vault (Purge Protection) | Cloud KMS Key Ring |
-| **Encryption at rest** | SSE-KMS on all S3 buckets | Storage Account CMK | CMEK on BigQuery + GCS |
-| **Encryption in transit** | TLS 1.2+ enforced | HTTPS only, Private Endpoints | VPC Service Controls |
-| **PII Masking** | Column-level via Glue transforms | Dynamic Data Masking in Synapse | SHA-256 hash in Dataflow + BigQuery column policy |
-| **Audit Logging** | CloudTrail (multi-region, log validation) | Azure Monitor + Log Analytics | Cloud Logging → BigQuery sink |
-| **Access Control** | Lake Formation fine-grained | Synapse RBAC + Row-Level Security | BigQuery IAM + Column-level Security |
-| **Governance** | AWS Macie (PII discovery) | Microsoft Purview (prod only) | Data Catalog tags |
+| **Orchestration** | Apache Airflow | 2.8.x | DAG scheduling, cross-cloud coordination |
+| **Transformation** | dbt | 1.7.x | SQL models, testing, documentation, lineage |
+| **AWS Storage** | Delta Lake on S3 | 3.1.x | ACID open table format on object storage |
+| **AWS Catalog** | AWS Glue + Lake Formation | — | Metadata catalog, fine-grained column access |
+| **Azure ETL** | Azure Data Factory | v2 | Parameterized ingestion pipelines, linked services |
+| **Azure Warehouse** | Azure Synapse Analytics | — | MPP SQL pool + Spark pool |
+| **Azure Storage** | ADLS Gen2 | — | Hierarchical namespace blob storage |
+| **GCP Analytics** | BigQuery | — | Serverless analytics engine + in-warehouse ML |
+| **GCP Streaming** | Apache Beam / Dataflow | 2.54.x | Exactly-once Pub/Sub to BigQuery pipeline |
+| **IaC** | Terraform | 1.6.x | Multi-cloud resource provisioning |
+| **Containers** | Docker + Compose | 24.x | Local dev environment, CI/CD build artifacts |
+| **CI/CD** | GitHub Actions | — | Lint, test, Terraform plan, zero-downtime deploy |
+| **Secrets (AWS)** | AWS KMS | — | Encryption key management, 90-day rotation |
+| **Secrets (Azure)** | Azure Key Vault | — | Secrets, CMK, purge protection |
+| **Secrets (GCP)** | Cloud KMS | — | CMEK for BigQuery + GCS |
+| **Language** | Python | 3.11 | Airflow DAGs, Dataflow pipeline, Delta utilities |
 
 ---
 
-### 7. CI/CD Pipeline (GitHub Actions)
-
-```
-on: push to main/develop, PR to main
-         │
-         ▼
-   lint-and-test
-   ├── Ruff linting
-   ├── mypy type checking
-   └── pytest (unit tests + coverage)
-         │
-    ┌────┴────┐
-    ▼         ▼
-dbt-validate  terraform-validate
-├── dbt deps  ├── terraform init
-├── dbt compile  ├── terraform validate
-└── dbt parse    ├── terraform fmt
-                 └── terraform plan
-                      (PR comment with diff)
-         │
-         ▼
-   docker-build
-   └── Build + push to GHCR (multi-platform)
-         │
-   ┌─────┴──────┐
-   ▼             ▼
-deploy-staging  deploy-production
-(develop branch) (main branch)
-├── DAG sync     ├── Terraform apply
-├── dbt run      ├── DAG sync
-└── dbt test     └── Slack notification
-```
-
-**Security features in CI/CD:**
-- OIDC (keyless) authentication to all three cloud providers — no static credentials stored in GitHub Secrets
-- Separate IAM roles per environment (dev/staging/prod) with scoped permissions
-- Terraform plan output posted as PR comment for peer review before apply
-- `max_active_runs: 1` on production DAG prevents concurrent pipeline collisions
-
----
-
-## Local Development Setup
+## 💻 Local Development
 
 ### Prerequisites
 
 - Docker Desktop 4.x+
 - Terraform 1.6+
 - Python 3.11+
-- GCP service account JSON keyfile
-- AWS credentials (IAM user or role)
+- GCP service account JSON keyfile (for BigQuery access)
+- AWS credentials configured (`~/.aws/credentials` or env vars)
 
-### 1. Clone and configure environment
+### 1. Clone the repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/multi-cloud-lakehouse.git
-cd multi-cloud-lakehouse
-
-# Copy env template and populate values
-cp .env.example .env
-# Edit .env with your cloud credentials and project IDs
+git clone https://github.com/YOUR_USERNAME/multi-cloud-data-lakehouse.git
+cd multi-cloud-data-lakehouse
 ```
 
-### 2. Start the local stack
+### 2. Start the full local stack
 
 ```bash
-# Build and start all services (Airflow, Postgres, Redis, dbt)
+# Copy and configure environment variables
+cp .env.example .env
+# Edit .env with your GCP_PROJECT_ID, AWS credentials, Azure credentials
+
+# Build and start all services
 docker compose -f docker/docker-compose.yml up -d
 
-# Wait for init to complete
+# Follow init logs
 docker compose -f docker/docker-compose.yml logs -f airflow-init
 ```
 
-Access the Airflow UI at **http://localhost:8080** (admin / admin)
+Airflow UI: **http://localhost:8080** (username: `admin` / password: `admin`)
+Celery Flower: **http://localhost:5555**
 
-### 3. Run dbt locally
+### 3. Run dbt transformations
 
 ```bash
-# Open dbt container
+# Open interactive dbt container
 docker compose -f docker/docker-compose.yml run --rm dbt bash
 
-# Inside container
-dbt deps
-dbt compile --target dev
-dbt run --select staging.*
-dbt test
-dbt docs generate && dbt docs serve
+# Inside the container:
+dbt deps                          # install packages
+dbt compile --target dev          # syntax check (no DB connection needed)
+dbt run --select staging.*        # run staging models
+dbt test                          # run all schema + data tests
+dbt docs generate && dbt docs serve  # generate lineage docs at localhost:8080
 ```
 
 ### 4. Provision cloud infrastructure
@@ -430,78 +740,69 @@ dbt docs generate && dbt docs serve
 ```bash
 cd terraform/
 
-# Initialize with remote state
+# Authenticate to all three clouds
+aws configure
+az login
+gcloud auth application-default login
+
+# Initialize with remote state backend
 terraform init
 
-# Review plan
-terraform plan -var="environment=dev" -var-file="dev.tfvars"
+# Preview changes
+terraform plan \
+  -var="environment=dev" \
+  -var-file="dev.tfvars" \
+  -var="gcp_project_id=YOUR_PROJECT" \
+  -var="azure_subscription_id=YOUR_SUB_ID" \
+  -var="synapse_admin_password=YourP@ssw0rd"
 
 # Apply
-terraform apply -var="environment=dev" -var-file="dev.tfvars"
+terraform apply -var="environment=dev" -var-file="dev.tfvars" ...
+```
+
+### 5. Run the Dataflow pipeline locally (DirectRunner)
+
+```bash
+cd gcp/dataflow/
+
+pip install apache-beam[gcp]==2.54.0
+
+python pubsub_to_bigquery.py \
+  --runner DirectRunner \
+  --input_subscription projects/YOUR_PROJECT/subscriptions/YOUR_SUB \
+  --output_table YOUR_PROJECT:mc_lakehouse_dev.events \
+  --dead_letter_table YOUR_PROJECT:mc_lakehouse_dev.events_dlq
 ```
 
 ---
 
-## Environment Variables Reference
+## ✅ Skills Demonstrated
 
-| Variable | Description | Required |
-|---|---|---|
-| `GCP_PROJECT_ID` | GCP project ID | ✅ |
-| `DELTA_LAKE_BUCKET` | S3 bucket name for Delta Lake | ✅ |
-| `AZURE_SUBSCRIPTION_ID` | Azure subscription ID | ✅ |
-| `AZURE_TENANT_ID` | Azure AD tenant ID | ✅ |
-| `AZURE_CLIENT_ID` | Service principal client ID | ✅ |
-| `AZURE_CLIENT_SECRET` | Service principal client secret | ✅ |
-| `AIRFLOW_FERNET_KEY` | Airflow connection encryption key | ✅ |
-| `AIRFLOW_SECRET_KEY` | Airflow webserver secret key | ✅ |
-| `SYNAPSE_ADMIN_PASSWORD` | Synapse SQL admin password | ✅ |
-| `AWS_REGION` | AWS region (default: us-east-1) | ❌ |
-| `GCP_REGION` | GCP region (default: us-central1) | ❌ |
-| `ENVIRONMENT` | dev / staging / prod | ❌ |
+| Skill Area | What's Implemented |
+|---|---|
+| **Delta Lake on AWS** | ACID upserts (MERGE), schema enforcement, time travel, Z-ORDER OPTIMIZE, VACUUM, schema evolution, Glue Catalog registration |
+| **Azure Data Factory** | Parameterized pipeline templates, watermark-based incremental loads, linked services (SQL, ADLS, Synapse), dynamic range partitioning |
+| **Azure Synapse Analytics** | Dedicated SQL Pool provisioning, Spark Pool configuration, COPY command bulk-load, ADLS Gen2 integration, auto-pause |
+| **GCP BigQuery** | Partitioned + clustered table design, partition filter enforcement, CMEK encryption, BigQuery ML in-warehouse scoring, audit log sink |
+| **GCP Dataflow** | Apache Beam Flex Template, exactly-once semantics (Storage Write API), tumbling windows, dead-letter pattern, THROUGHPUT_BASED autoscaling |
+| **dbt** | Multi-target profiles (BigQuery + Snowflake), staging/marts layer separation, incremental MERGE materialization, schema tests, source freshness |
+| **Apache Airflow** | TaskGroups, S3/PubSub sensors, cross-cloud operators, CeleryExecutor, quality gate tasks, `TriggerRule.ALL_SUCCESS` |
+| **Terraform IaC** | Multi-cloud module abstraction, remote S3 state + DynamoDB lock, OIDC provider auth, environment-parameterized deployments |
+| **Data Governance** | IAM least-privilege (all 3 clouds), RBAC, CMEK, column-level masking, PII hashing, CloudTrail + Azure Monitor + Cloud Logging audit |
+| **CI/CD** | GitHub Actions, OIDC keyless cloud auth, parallel job execution, Terraform plan as PR comment, zero-downtime deploy gates |
 
 ---
 
-## Technology Stack
-
-| Layer | Technology | Version | Purpose |
-|---|---|---|---|
-| Orchestration | Apache Airflow | 2.8.x | DAG scheduling, cross-cloud coordination |
-| Transformation | dbt | 1.7.x | SQL transformation, testing, documentation |
-| AWS Storage | Delta Lake on S3 | 3.1.x | ACID open table format |
-| AWS Catalog | AWS Glue + Lake Formation | — | Metadata catalog, fine-grained access |
-| Azure ETL | Azure Data Factory | v2 | Parameterized ingestion pipelines |
-| Azure Warehouse | Azure Synapse Analytics | — | MPP SQL + Spark pool |
-| Azure Storage | ADLS Gen2 | — | Hierarchical namespace blob storage |
-| GCP Analytics | BigQuery | — | Serverless analytics + ML in-warehouse |
-| GCP Streaming | Apache Beam / Dataflow | 2.54.x | Exactly-once Pub/Sub → BQ pipeline |
-| IaC | Terraform | 1.6.x | Multi-cloud resource provisioning |
-| Containers | Docker + Compose | 24.x | Local dev, CI/CD build artifacts |
-| CI/CD | GitHub Actions | — | Lint, test, plan, deploy |
-| Secrets | AWS KMS / Azure Key Vault / Cloud KMS | — | Encryption key management |
-
----
-
-## Skills Demonstrated
-
-- ✅ **Delta Lake** — ACID guarantees, schema enforcement, time travel, Z-ORDER optimization on S3
-- ✅ **Azure Data Factory** — Parameterized pipeline templates, linked services, watermark incremental loads
-- ✅ **Azure Synapse Analytics** — Dedicated SQL Pool, Spark Pool, ADLS Gen2 integration
-- ✅ **GCP BigQuery** — Partitioned + clustered tables, BigQuery ML in-warehouse scoring
-- ✅ **GCP Dataflow** — Apache Beam streaming pipeline with PII masking and dead-letter routing
-- ✅ **dbt** — Multi-target (BigQuery + Snowflake), staging/mart layers, incremental models, schema tests
-- ✅ **Apache Airflow** — TaskGroups, sensors, cross-cloud operators, Celery worker scaling
-- ✅ **Terraform** — Multi-cloud IaC with module abstraction, remote state, OIDC auth
-- ✅ **Data Governance** — IAM least-privilege, RBAC, CMEK, column-level masking, PII hashing, audit logs
-- ✅ **CI/CD** — GitHub Actions with keyless OIDC auth, parallel jobs, Terraform plan PR comments
-
----
-
-## License
+## 📄 License
 
 MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
-<p align="center">
-  Built with ☁️ across AWS · Azure · GCP
-</p>
+<div align="center">
+
+Built across ☁️ **AWS** · ☁️ **Azure** · ☁️ **GCP**
+
+*Production-grade multi-cloud data engineering — Delta Lake · Synapse · BigQuery · dbt · Airflow · Terraform*
+
+</div>
