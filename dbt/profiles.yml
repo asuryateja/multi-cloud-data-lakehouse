@@ -1,0 +1,72 @@
+##############################################################################
+# dbt profiles.yml — Multi-Cloud Lakehouse
+# Supports BigQuery (GCP) and Snowflake targets with environment overrides
+##############################################################################
+
+mc_lakehouse:
+  target: "{{ env_var('DBT_TARGET', 'dev') }}"
+
+  outputs:
+
+    # ── GCP BigQuery ───────────────────────────────────────────────────────
+    dev:
+      type: bigquery
+      method: service-account
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
+      dataset: "mc_lakehouse_dev"
+      location: US
+      keyfile: "{{ env_var('GCP_KEYFILE_PATH', '/secrets/gcp_keyfile.json') }}"
+      threads: 4
+      timeout_seconds: 300
+      priority: interactive
+      retries: 1
+
+    staging:
+      type: bigquery
+      method: service-account
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
+      dataset: "mc_lakehouse_staging"
+      location: US
+      keyfile: "{{ env_var('GCP_KEYFILE_PATH') }}"
+      threads: 8
+      timeout_seconds: 600
+      priority: interactive
+      maximum_bytes_billed: 10000000000  # 10 GB safety cap
+
+    prod:
+      type: bigquery
+      method: oauth
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
+      dataset: "mc_lakehouse_prod"
+      location: US
+      threads: 16
+      timeout_seconds: 1800
+      priority: batch
+      maximum_bytes_billed: 1000000000000  # 1 TB
+
+    # ── Snowflake (cross-platform dbt models) ─────────────────────────────
+    snowflake_dev:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      role: "TRANSFORMER_DEV"
+      database: "LAKEHOUSE_DEV"
+      warehouse: "TRANSFORM_WH_XS"
+      schema: "MC_LAKEHOUSE"
+      threads: 4
+      client_session_keep_alive: false
+      query_tag: "dbt_mc_lakehouse_dev"
+
+    snowflake_prod:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      authenticator: externalbrowser
+      role: "TRANSFORMER_PROD"
+      database: "LAKEHOUSE_PROD"
+      warehouse: "TRANSFORM_WH_L"
+      schema: "MC_LAKEHOUSE"
+      threads: 16
+      client_session_keep_alive: false
+      query_tag: "dbt_mc_lakehouse_prod"

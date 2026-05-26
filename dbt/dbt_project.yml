@@ -1,0 +1,76 @@
+name: "multi_cloud_lakehouse"
+version: "1.0.0"
+config-version: 2
+
+profile: "mc_lakehouse"
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+docs-paths: ["docs"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# ── Model Config ───────────────────────────────────────────────────────────────
+models:
+  multi_cloud_lakehouse:
+
+    # Staging layer: source-conformed, minimal transforms
+    staging:
+      +materialized: view
+      +schema: staging
+      +tags: ["staging", "daily"]
+      +meta:
+        owner: "data-platform"
+        layer: "bronze-to-silver"
+
+    # Marts layer: business-ready, analytics-optimized
+    marts:
+      +materialized: table
+      +schema: marts
+      +tags: ["marts", "daily"]
+      +meta:
+        owner: "data-platform"
+        layer: "gold"
+
+      core:
+        +materialized: table
+        bigquery:
+          +cluster_by: ["event_type", "user_id"]
+          +partition_by:
+            field: "event_date"
+            data_type: "date"
+            granularity: "day"
+
+      intermediate:
+        +materialized: ephemeral
+
+# ── Seeds Config ───────────────────────────────────────────────────────────────
+seeds:
+  multi_cloud_lakehouse:
+    +schema: seeds
+    +tags: ["seeds"]
+
+# ── Snapshots Config ───────────────────────────────────────────────────────────
+snapshots:
+  multi_cloud_lakehouse:
+    +target_schema: snapshots
+    +strategy: timestamp
+    +updated_at: updated_at
+
+# ── Tests ─────────────────────────────────────────────────────────────────────
+tests:
+  multi_cloud_lakehouse:
+    +severity: error
+    +store_failures: true
+    +schema: test_results
+
+# ── Docs ──────────────────────────────────────────────────────────────────────
+docs:
+  +node_color: "#2C75B8"
