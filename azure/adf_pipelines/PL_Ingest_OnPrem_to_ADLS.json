@@ -1,0 +1,168 @@
+{
+  "name": "PL_Ingest_OnPrem_to_ADLS",
+  "properties": {
+    "description": "Parameterized ingestion pipeline: reads from on-premises SQL Server or Azure SQL via self-hosted IR, applies incremental watermark logic, writes Parquet to ADLS Gen2 bronze container, then triggers Synapse Analytics copy activity.",
+    "activities": [
+
+      {
+        "name": "LookupWatermark",
+        "description": "Fetch the last successfully loaded high-watermark timestamp from the control table",
+        "type": "Lookup",
+        "dependsOn": [],
+        "policy": { "timeout": "00:05:00", "retry": 2, "retryIntervalInSeconds": 30 },
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sqlReaderQuery": "SELECT MAX(last_load_timestamp) AS watermark FROM [dbo].[pipeline_control] WHERE pipeline_name = '@{pipeline().Pipeline}' AND table_name = '@{pipeline().parameters.SourceTable}'"
+          },
+          "dataset": { "referenceName": "DS_Azure_SQL_Control", "type": "DatasetReference" },
+          "firstRowOnly": true
+        }
+      },
+
+      {
+        "name": "CopySourceToAdls",
+        "description": "Incremental copy from on-prem SQL Server to ADLS Gen2 bronze zone as Parquet",
+        "type": "Copy",
+        "dependsOn": [
+          { "activity": "LookupWatermark", "dependencyConditions": ["Succeeded"] }
+        ],
+        "policy": { "timeout": "02:00:00", "retry": 3, "retryIntervalInSeconds": 60 },
+        "typeProperties": {
+          "source": {
+            "type": "SqlServerSource",
+            "sqlReaderQuery": "SELECT * FROM @{pipeline().parameters.SourceTable} WHERE updated_at > '@{activity('LookupWatermark').output.firstRow.watermark}' AND updated_at <= '@{pipeline().parameters.PartitionDate} 23:59:59'",
+            "queryTimeout": "02:00:00",
+            "partitionOption": "DynamicRange",
+            "partitionSettings": {
+              "partitionColumnName": "@{pipeline().parameters.PartitionColumn}",
+              "partitionUpperBound": "@{pipeline().parameters.PartitionUpperBound}",
+              "partitionLowerBound": "@{pipeline().parameters.PartitionLowerBound}"
+            }
+          },
+          "sink": {
+            "type": "ParquetSink",
+            "storeSettings": {
+              "type": "AzureBlobFSWriteSettings",
+              "copyBehavior": "FlattenHierarchy"
+            },
+            "formatSettings": {
+              "type": "ParquetWriteSettings",
+              "fileExtension": ".snappy.parquet",
+              "compressionCodec": "Snappy"
+            }
+          },
+          "enableStaging": false,
+          "parallelCopies": 4,
+          "dataIntegrationUnits": 8,
+          "translator": {
+            "type": "TabularTranslator",
+            "typeConversion": true,
+            "typeConversionSettings": { "allowDataTruncation": false, "treatBooleanAsNumber": false }
+          }
+        },
+        "inputs": [
+          { "referenceName": "DS_OnPrem_SQL", "type": "DatasetReference",
+            "parameters": { "SchemaName": "@pipeline().parameters.SourceSchema", "TableName": "@pipeline().parameters.SourceTable" } }
+        ],
+        "outputs": [
+          { "referenceName": "DS_ADLS_Parquet", "type": "DatasetReference",
+            "parameters": {
+              "Container": "bronze",
+              "FolderPath": "@concat(pipeline().parameters.TargetFolder, '/', formatDateTime(pipeline().parameters.PartitionDate, 'yyyy/MM/dd'))",
+              "FileName": "@concat(pipeline().parameters.SourceTable, '_', pipeline().parameters.PartitionDate, '.snappy.parquet')"
+            }
+          }
+        ]
+      },
+
+      {
+        "name": "CopyAdlsToSynapse",
+        "description": "Stage Parquet from ADLS into Synapse dedicated SQL pool via COPY statement",
+        "type": "Copy",
+        "dependsOn": [
+          { "activity": "CopySourceToAdls", "dependencyConditions": ["Succeeded"] }
+        ],
+        "policy": { "timeout": "01:00:00", "retry": 2, "retryIntervalInSeconds": 30 },
+        "typeProperties": {
+          "source": {
+            "type": "ParquetSource",
+            "storeSettings": {
+              "type": "AzureBlobFSReadSettings",
+              "recursive": false,
+              "enablePartitionDiscovery": false
+            }
+          },
+          "sink": {
+            "type": "SqlDWSink",
+            "allowCopyCommand": true,
+            "copyCommandSettings": {
+              "defaultValues": [],
+              "additionalOptions": { "DATA_COMPRESSION": "'org.apache.hadoop.io.compress.GzipCodec'" }
+            },
+            "writeBehavior": "Upsert",
+            "upsertSettings": {
+              "useTempDB": false,
+              "keys": ["@{pipeline().parameters.PrimaryKey}"]
+            },
+            "tableOption": "autoCreate",
+            "disableMetricsCollection": false
+          },
+          "enableStaging": true,
+          "stagingSettings": {
+            "linkedServiceName": { "referenceName": "LS_ADLS_Gen2", "type": "LinkedServiceReference" },
+            "path": "staging/@{pipeline().parameters.SourceTable}"
+          }
+        },
+        "inputs": [
+          { "referenceName": "DS_ADLS_Parquet", "type": "DatasetReference",
+            "parameters": {
+              "Container": "bronze",
+              "FolderPath": "@concat(pipeline().parameters.TargetFolder, '/', formatDateTime(pipeline().parameters.PartitionDate, 'yyyy/MM/dd'))",
+              "FileName": "@concat(pipeline().parameters.SourceTable, '_', pipeline().parameters.PartitionDate, '.snappy.parquet')"
+            }
+          }
+        ],
+        "outputs": [
+          { "referenceName": "DS_Synapse_DW", "type": "DatasetReference",
+            "parameters": { "SchemaName": "bronze", "TableName": "@pipeline().parameters.SourceTable" } }
+        ]
+      },
+
+      {
+        "name": "UpdateWatermark",
+        "description": "Update the control table with the new high-watermark on successful load",
+        "type": "SqlServerStoredProcedure",
+        "dependsOn": [
+          { "activity": "CopyAdlsToSynapse", "dependencyConditions": ["Succeeded"] }
+        ],
+        "typeProperties": {
+          "storedProcedureName": "[dbo].[usp_UpdatePipelineWatermark]",
+          "storedProcedureParameters": {
+            "pipeline_name": { "value": "@pipeline().Pipeline", "type": "String" },
+            "table_name":    { "value": "@pipeline().parameters.SourceTable", "type": "String" },
+            "new_watermark": { "value": "@pipeline().parameters.PartitionDate", "type": "String" },
+            "rows_copied":   { "value": "@activity('CopySourceToAdls').output.rowsCopied", "type": "Int32" }
+          }
+        },
+        "linkedServiceName": { "referenceName": "LS_Azure_SQL_Control", "type": "LinkedServiceReference" }
+      }
+
+    ],
+
+    "parameters": {
+      "SourceSchema":        { "type": "string", "defaultValue": "dbo" },
+      "SourceTable":         { "type": "string" },
+      "TargetFolder":        { "type": "string" },
+      "PartitionDate":       { "type": "string" },
+      "PartitionColumn":     { "type": "string", "defaultValue": "id" },
+      "PartitionUpperBound": { "type": "int",    "defaultValue": 1000000 },
+      "PartitionLowerBound": { "type": "int",    "defaultValue": 1 },
+      "PrimaryKey":          { "type": "string", "defaultValue": "id" }
+    },
+
+    "annotations": ["multi-cloud-lakehouse", "azure", "incremental-ingestion"],
+    "concurrency": 3,
+    "folder": { "name": "Ingestion" }
+  }
+}
