@@ -1,0 +1,168 @@
+##############################################################################
+# Docker Compose — Multi-Cloud Lakehouse Local Dev Stack
+# Services: Airflow (webserver + scheduler + worker), PostgreSQL, Redis, dbt
+##############################################################################
+
+version: "3.9"
+
+x-airflow-common: &airflow-common
+  image: ${AIRFLOW_IMAGE:-mc-lakehouse-airflow:latest}
+  build:
+    context: .
+    dockerfile: docker/Dockerfile.airflow
+  environment: &airflow-env
+    AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres:5432/airflow
+    AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:?Set AIRFLOW_FERNET_KEY in .env}
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:?Set AIRFLOW_SECRET_KEY}
+    AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
+    # Cloud credentials (mount secrets in prod; use env for local dev)
+    AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+    AWS_DEFAULT_REGION: ${AWS_REGION:-us-east-1}
+    GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/secrets/gcp_keyfile.json
+    AZURE_TENANT_ID: ${AZURE_TENANT_ID:-}
+    AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:-}
+    AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET:-}
+    # App config
+    ENVIRONMENT: dev
+    GCP_PROJECT_ID: ${GCP_PROJECT_ID:?Set GCP_PROJECT_ID}
+    DELTA_LAKE_BUCKET: ${DELTA_LAKE_BUCKET:-mc-lakehouse-delta-lake-dev}
+    BQ_DATASET: mc_lakehouse_dev
+    DBT_TARGET: dev
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - ./airflow/logs:/opt/airflow/logs
+    - ./airflow/plugins:/opt/airflow/plugins
+    - ./dbt:/app/dbt
+    - ./secrets:/opt/airflow/secrets:ro
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+
+  # ── PostgreSQL (Airflow metadata DB) ────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+
+  # ── Redis (Celery broker) ────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Airflow DB Init ──────────────────────────────────────────────────────────
+  airflow-init:
+    <<: *airflow-common
+    command: >
+      bash -c "
+        airflow db upgrade &&
+        airflow users create
+          --username admin
+          --password admin
+          --firstname Admin
+          --lastname User
+          --role Admin
+          --email admin@local.dev
+      "
+    restart: "no"
+
+  # ── Airflow Webserver ────────────────────────────────────────────────────────
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  # ── Airflow Scheduler ────────────────────────────────────────────────────────
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    healthcheck:
+      test: ["CMD", "airflow", "jobs", "check", "--job-type", "SchedulerJob", "--hostname", "$$(hostname)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Airflow Celery Worker ─────────────────────────────────────────────────────
+  airflow-worker:
+    <<: *airflow-common
+    command: celery worker
+    environment:
+      <<: *airflow-env
+      DUMB_INIT_SETSID: "0"
+    healthcheck:
+      test: ["CMD-SHELL", "celery --app airflow.executors.celery_executor.app inspect ping -d celery@$${HOSTNAME}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+
+  # ── Airflow Flower (Celery monitor) ──────────────────────────────────────────
+  airflow-flower:
+    <<: *airflow-common
+    command: celery flower
+    ports:
+      - "5555:5555"
+    restart: unless-stopped
+
+  # ── dbt CLI container (run dbt commands manually) ────────────────────────────
+  dbt:
+    image: ghcr.io/dbt-labs/dbt-bigquery:${DBT_VERSION:-1.7.4}
+    working_dir: /app/dbt
+    volumes:
+      - ./dbt:/app/dbt
+      - ./secrets:/secrets:ro
+    environment:
+      DBT_TARGET: dev
+      GCP_PROJECT_ID: ${GCP_PROJECT_ID}
+      GCP_KEYFILE_PATH: /secrets/gcp_keyfile.json
+    profiles: ["dbt"]
+    command: ["bash"]
+    stdin_open: true
+    tty: true
+
+volumes:
+  postgres_data:
+  redis_data:
